@@ -30,7 +30,7 @@
             border-radius: 15px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
             width: 90%;
-            max-width: 800px;
+            max-width: 900px;
             padding: 30px;
             margin-top: 20px;
         }
@@ -187,6 +187,133 @@
             border-radius: 5px;
         }
 
+        /* Container para múltiplas sequências */
+        .sequences-container {
+            background-color: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .sequences-title {
+            font-size: 1rem;
+            color: #7f8c8d;
+            margin-bottom: 10px;
+        }
+
+        .sequence-option {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            background-color: white;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .sequence-option:hover {
+            background-color: #f1f8ff;
+            border-color: #3498db;
+        }
+
+        .sequence-option.selected {
+            background-color: #e9f7fe;
+            border-color: #3498db;
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+
+        .sequence-text {
+            font-family: monospace;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+
+        .sequence-result {
+            font-family: monospace;
+            font-size: 1.1rem;
+            font-weight: bold;
+            padding: 4px 10px;
+            border-radius: 4px;
+        }
+
+        .result-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .result-failure {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .sequence-length {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+
+        /* Nova seção: Estatísticas de probabilidade */
+        .probability-box {
+            background-color: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .probability-label {
+            font-size: 1rem;
+            color: #7f8c8d;
+            margin-bottom: 10px;
+        }
+
+        .probability-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #2c3e50;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .probability-details {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #dee2e6;
+        }
+
+        .probability-detail {
+            text-align: center;
+        }
+
+        .probability-detail-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .probability-detail-label {
+            font-size: 0.8rem;
+            color: #7f8c8d;
+        }
+
+        .success-probability {
+            color: #2ecc71;
+        }
+
+        .failure-probability {
+            color: #e74c3c;
+        }
+
         .controls {
             display: flex;
             gap: 10px;
@@ -241,6 +368,11 @@
             .buttons-container {
                 flex-direction: column;
             }
+            
+            .probability-details {
+                flex-direction: column;
+                gap: 10px;
+            }
         }
     </style>
 </head>
@@ -268,15 +400,29 @@
             </div>
             
             <div class="sequence-section">
-                <h2 class="section-title">Próxima Sequência</h2>
+                <h2 class="section-title">Previsão</h2>
                 <div class="prediction-box">
                     <div class="prediction-label">Próximo valor previsto:</div>
                     <div class="prediction-value" id="predictionValue">-</div>
                 </div>
                 
+                <!-- Nova seção: Probabilidade baseada em todas as sequências -->
+                <div class="probability-box" id="probabilityBox">
+                    <div class="probability-label">Probabilidade baseada em todas as sequências:</div>
+                    <div class="probability-value" id="probabilityValue">-</div>
+                    <div class="probability-details" id="probabilityDetails">
+                        <!-- Detalhes serão preenchidos via JavaScript -->
+                    </div>
+                </div>
+                
                 <div class="sequence-info">
-                    <div class="sequence-info-title">Sequência encontrada:</div>
+                    <div class="sequence-info-title">Sequência base selecionada:</div>
                     <div class="sequence-found" id="sequenceFound">-</div>
+                </div>
+                
+                <div class="sequences-container" id="sequencesContainer">
+                    <div class="sequences-title">Sequências encontradas (selecione uma):</div>
+                    <div id="sequencesList"></div>
                 </div>
                 
                 <div class="stats">
@@ -307,13 +453,19 @@
             const sequenceDisplay = document.getElementById('sequenceDisplay');
             const predictionValue = document.getElementById('predictionValue');
             const sequenceFound = document.getElementById('sequenceFound');
+            const sequencesList = document.getElementById('sequencesList');
             const successCount = document.getElementById('successCount');
             const failureCount = document.getElementById('failureCount');
             const totalCount = document.getElementById('totalCount');
+            const probabilityValue = document.getElementById('probabilityValue');
+            const probabilityDetails = document.getElementById('probabilityDetails');
+            const probabilityBox = document.getElementById('probabilityBox');
             
             // Estado da aplicação
             let sequence = '';
             let history = [];
+            let selectedSequenceIndex = -1;
+            let foundSequences = [];
             
             // Função para adicionar um valor à sequência
             function addToSequence(value) {
@@ -321,7 +473,7 @@
                 history.push(sequence);
                 updateDisplay();
                 updateStats();
-                predictNext();
+                findSequences();
             }
             
             // Função para atualizar a exibição
@@ -339,36 +491,110 @@
                 totalCount.textContent = sequence.length;
             }
             
-            // Função para prever o próximo valor
-            function predictNext() {
-                if (sequence.length < 3) {
-                    predictionValue.textContent = '-';
-                    sequenceFound.textContent = '-';
+            // Função para calcular probabilidades baseadas em todas as sequências
+            function calculateProbability() {
+                if (foundSequences.length === 0) {
+                    probabilityValue.textContent = '-';
+                    probabilityValue.style.color = '#2c3e50';
+                    probabilityDetails.innerHTML = '';
+                    probabilityBox.style.display = 'block';
                     return;
                 }
                 
-                // Procurar por sequências repetidas
-                const lastThree = sequence.slice(-3);
-                let foundIndex = -1;
+                // Contar quantas sequências resultam em S e quantas em F
+                let successCount = 0;
+                let failureCount = 0;
                 
-                // Procura pela última ocorrência da mesma sequência de 3 caracteres
-                for (let i = 0; i < sequence.length - 3; i++) {
-                    if (sequence.substring(i, i + 3) === lastThree) {
-                        foundIndex = i;
+                foundSequences.forEach(seq => {
+                    if (seq.nextValue === 'S') {
+                        successCount++;
+                    } else {
+                        failureCount++;
+                    }
+                });
+                
+                // Calcular porcentagens
+                const totalSequences = foundSequences.length;
+                const successPercentage = Math.round((successCount / totalSequences) * 100);
+                const failurePercentage = Math.round((failureCount / totalSequences) * 100);
+                
+                // Atualizar o valor principal da probabilidade
+                probabilityValue.textContent = `${successPercentage}%`;
+                probabilityValue.style.color = successPercentage >= 50 ? '#2ecc71' : '#e74c3c';
+                
+                // Atualizar os detalhes
+                probabilityDetails.innerHTML = `
+                    <div class="probability-detail">
+                        <div class="probability-detail-value success-probability">${successCount}/${totalSequences}</div>
+                        <div class="probability-detail-label">Sucesso</div>
+                    </div>
+                    <div class="probability-detail">
+                        <div class="probability-detail-value failure-probability">${failureCount}/${totalSequences}</div>
+                        <div class="probability-detail-label">Falha</div>
+                    </div>
+                    <div class="probability-detail">
+                        <div class="probability-detail-value">${totalSequences}</div>
+                        <div class="probability-detail-label">Total Seq.</div>
+                    </div>
+                `;
+                
+                probabilityBox.style.display = 'block';
+            }
+            
+            // Função para encontrar todas as sequências correspondentes (3 a 6 caracteres)
+            function findSequences() {
+                if (sequence.length < 4) {
+                    predictionValue.textContent = '-';
+                    predictionValue.style.color = '#2c3e50';
+                    sequenceFound.textContent = '-';
+                    sequenceFound.style.color = '#2c3e50';
+                    sequencesList.innerHTML = '<div style="text-align: center; color: #6c757d; padding: 10px;">Adicione mais registros para encontrar sequências</div>';
+                    foundSequences = [];
+                    selectedSequenceIndex = -1;
+                    calculateProbability();
+                    return;
+                }
+                
+                foundSequences = [];
+                const currentLength = sequence.length;
+                
+                // Procurar sequências de 3 a 6 caracteres
+                for (let seqLength = 3; seqLength <= 6 && seqLength <= currentLength - 1; seqLength++) {
+                    // Pegar os últimos 'seqLength' caracteres
+                    const lastSequence = sequence.slice(-seqLength);
+                    
+                    // Procurar ocorrências anteriores
+                    for (let i = 0; i <= currentLength - seqLength - 1; i++) {
+                        if (sequence.substring(i, i + seqLength) === lastSequence) {
+                            // Encontrou uma sequência correspondente
+                            const nextValue = sequence.charAt(i + seqLength);
+                            foundSequences.push({
+                                sequence: lastSequence,
+                                nextValue: nextValue,
+                                length: seqLength,
+                                position: i
+                            });
+                        }
                     }
                 }
                 
-                // Se encontrou uma sequência repetida
-                if (foundIndex !== -1) {
-                    // O próximo valor após a sequência repetida
-                    const nextValue = sequence.charAt(foundIndex + 3);
-                    predictionValue.textContent = nextValue;
-                    predictionValue.style.color = nextValue === 'S' ? '#2ecc71' : '#e74c3c';
-                    
-                    // Mostrar a sequência encontrada
-                    const foundSequence = sequence.substring(foundIndex, foundIndex + 3);
-                    sequenceFound.textContent = `${foundSequence} → ${nextValue}`;
-                    sequenceFound.style.color = nextValue === 'S' ? '#2ecc71' : '#e74c3c';
+                // Ordenar por comprimento (mais longa primeiro)
+                foundSequences.sort((a, b) => b.length - a.length);
+                
+                // Exibir sequências encontradas
+                displaySequences();
+                
+                // Calcular probabilidades
+                calculateProbability();
+                
+                // Selecionar automaticamente a sequência mais longa (ou primeira se não houver seleção)
+                if (foundSequences.length > 0) {
+                    if (selectedSequenceIndex === -1 || selectedSequenceIndex >= foundSequences.length) {
+                        selectSequence(0);
+                    } else {
+                        // Manter a seleção atual se possível
+                        updateSelectedSequence();
+                    }
                 } else {
                     predictionValue.textContent = '-';
                     predictionValue.style.color = '#2c3e50';
@@ -377,16 +603,89 @@
                 }
             }
             
+            // Função para exibir a lista de sequências encontradas
+            function displaySequences() {
+                sequencesList.innerHTML = '';
+                
+                if (foundSequences.length === 0) {
+                    sequencesList.innerHTML = '<div style="text-align: center; color: #6c757d; padding: 10px;">Nenhuma sequência correspondente encontrada</div>';
+                    return;
+                }
+                
+                foundSequences.forEach((seq, index) => {
+                    const seqElement = document.createElement('div');
+                    seqElement.className = `sequence-option ${index === selectedSequenceIndex ? 'selected' : ''}`;
+                    seqElement.dataset.index = index;
+                    
+                    const seqText = document.createElement('div');
+                    seqText.className = 'sequence-text';
+                    seqText.textContent = `${seq.sequence} → ${seq.nextValue}`;
+                    
+                    const seqInfo = document.createElement('div');
+                    seqInfo.style.display = 'flex';
+                    seqInfo.style.alignItems = 'center';
+                    seqInfo.style.gap = '10px';
+                    
+                    const resultSpan = document.createElement('span');
+                    resultSpan.className = `sequence-result ${seq.nextValue === 'S' ? 'result-success' : 'result-failure'}`;
+                    resultSpan.textContent = seq.nextValue;
+                    
+                    const lengthSpan = document.createElement('span');
+                    lengthSpan.className = 'sequence-length';
+                    lengthSpan.textContent = `${seq.length} chars`;
+                    
+                    seqInfo.appendChild(resultSpan);
+                    seqInfo.appendChild(lengthSpan);
+                    
+                    seqElement.appendChild(seqText);
+                    seqElement.appendChild(seqInfo);
+                    
+                    seqElement.addEventListener('click', () => selectSequence(index));
+                    
+                    sequencesList.appendChild(seqElement);
+                });
+            }
+            
+            // Função para selecionar uma sequência específica
+            function selectSequence(index) {
+                selectedSequenceIndex = index;
+                updateSelectedSequence();
+            }
+            
+            // Função para atualizar a exibição da sequência selecionada
+            function updateSelectedSequence() {
+                if (selectedSequenceIndex >= 0 && selectedSequenceIndex < foundSequences.length) {
+                    const selectedSeq = foundSequences[selectedSequenceIndex];
+                    
+                    // Atualizar previsão
+                    predictionValue.textContent = selectedSeq.nextValue;
+                    predictionValue.style.color = selectedSeq.nextValue === 'S' ? '#2ecc71' : '#e74c3c';
+                    
+                    // Atualizar sequência base
+                    sequenceFound.textContent = `${selectedSeq.sequence} → ${selectedSeq.nextValue}`;
+                    sequenceFound.style.color = selectedSeq.nextValue === 'S' ? '#2ecc71' : '#e74c3c';
+                    
+                    // Atualizar lista de sequências
+                    displaySequences();
+                }
+            }
+            
             // Função para limpar a sequência
             function clearSequence() {
                 sequence = '';
                 history = [];
+                foundSequences = [];
+                selectedSequenceIndex = -1;
                 updateDisplay();
                 updateStats();
                 predictionValue.textContent = '-';
                 predictionValue.style.color = '#2c3e50';
                 sequenceFound.textContent = '-';
                 sequenceFound.style.color = '#2c3e50';
+                sequencesList.innerHTML = '<div style="text-align: center; color: #6c757d; padding: 10px;">Adicione mais registros para encontrar sequências</div>';
+                probabilityValue.textContent = '-';
+                probabilityValue.style.color = '#2c3e50';
+                probabilityDetails.innerHTML = '';
             }
             
             // Função para desfazer a última ação
@@ -396,7 +695,7 @@
                     sequence = history.pop() || ''; // Volta para a anterior
                     updateDisplay();
                     updateStats();
-                    predictNext();
+                    findSequences();
                 } else if (history.length === 1) {
                     sequence = '';
                     history = [];
@@ -406,6 +705,10 @@
                     predictionValue.style.color = '#2c3e50';
                     sequenceFound.textContent = '-';
                     sequenceFound.style.color = '#2c3e50';
+                    sequencesList.innerHTML = '<div style="text-align: center; color: #6c757d; padding: 10px;">Adicione mais registros para encontrar sequências</div>';
+                    probabilityValue.textContent = '-';
+                    probabilityValue.style.color = '#2c3e50';
+                    probabilityDetails.innerHTML = '';
                 }
             }
             
@@ -418,6 +721,8 @@
             // Inicialização
             updateDisplay();
             updateStats();
+            sequencesList.innerHTML = '<div style="text-align: center; color: #6c757d; padding: 10px;">Adicione mais registros para encontrar sequências</div>';
+            probabilityBox.style.display = 'block';
         });
     </script>
 </body>
